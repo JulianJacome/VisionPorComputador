@@ -1,0 +1,27 @@
+# --- Web Scraping ---
+requests
+beautifulsoup4
+lxml
+selenium
+webdriver-manager
+
+# --- Manejo de Datos ---
+pandas
+numpy
+
+# --- Base de Datos (PostgreSQL) ---
+psycopg2-binary
+SQLAlchemy
+
+# --- API Backend (opcional pero recomendado) ---
+fastapi
+uvicorn
+
+# --- Análisis / Machine Learning (solo si lo necesitas) ---
+scikit-learn
+
+# --- Manejo de Entornos ---
+python-dotenv
+
+# --- Utilidades ---
+tqdm
