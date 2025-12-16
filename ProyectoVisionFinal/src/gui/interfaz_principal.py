@@ -3,6 +3,12 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 import threading
+import os
+import sys
+
+# Agregar el directorio src al path para importar módulos
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from reconocimiento.modelo_reconocimiento import FaceRecognizer
 
 class VisionApp:
     def __init__(self, root):
@@ -14,6 +20,14 @@ class VisionApp:
         self.camera_index = 0
         self.cap = None
         self.running = False
+        self.current_frame = None
+        self.detect_faces = False
+        self.detect_objects = False
+
+        # Cargar clasificadores de OpenCV
+        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        self.body_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fullbody.xml')
+        self.face_recognizer = FaceRecognizer()
 
         self.build_interface()
 
@@ -69,6 +83,10 @@ class VisionApp:
                           command=self.change_camera)
         btn5.pack(fill="x", padx=20, pady=10)
 
+        btn_train = ttk.Button(side_panel, text="Entrenar Modelo",
+                               command=self.train_model)
+        btn_train.pack(fill="x", padx=20, pady=10)
+
         # === MENÚ SUPERIOR ===
         menu = tk.Menu(self.root)
         self.root.config(menu=menu)
@@ -94,17 +112,43 @@ class VisionApp:
         
         ret, frame = self.cap.read()
         if ret:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = cv2.resize(frame, (780, 560))
+            self.current_frame = frame.copy()  # Guardar frame original para procesamiento
+            
+            # Procesar detecciones
+            display_frame = frame.copy()
+            if self.detect_faces:
+                display_frame = self.detect_and_draw_faces(display_frame)
+            elif self.detect_objects:
+                display_frame = self.detect_and_draw_objects(display_frame)
+            
+            display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+            display_frame = cv2.resize(display_frame, (780, 560))
 
-            img = ImageTk.PhotoImage(Image.fromarray(frame))
+            img = ImageTk.PhotoImage(Image.fromarray(display_frame))
             self.video_frame.imgtk = img
             self.video_frame.config(image=img)
         
         self.root.after(10, self.update_frame)
 
+    def detect_and_draw_faces(self, frame):
+        recognized_faces = self.face_recognizer.recognize_face(frame)
+        for (x, y, w, h, name, confidence) in recognized_faces:
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            cv2.putText(frame, f'{name} ({confidence:.2f})', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
+        return frame
+
+    def detect_and_draw_objects(self, frame):
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        bodies = self.body_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        for (x, y, w, h) in bodies:
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            cv2.putText(frame, 'Persona', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        return frame
+
     def stop_camera(self):
         self.running = False
+        self.detect_faces = False
+        self.detect_objects = False
         if self.cap:
             self.cap.release()
         self.video_frame.config(image='')
@@ -113,10 +157,20 @@ class VisionApp:
     #  PLACEHOLDERS PARA MÓDULOS
     # ============================
     def run_face_recognition(self):
-        messagebox.showinfo("Reconocimiento Facial", "Aquí se ejecutará tu modelo facial.")
+        if not self.running:
+            messagebox.showwarning("Advertencia", "Primero inicia la cámara.")
+            return
+        self.detect_faces = True
+        self.detect_objects = False
+        messagebox.showinfo("Reconocimiento Facial", "Detectando rostros en tiempo real.")
 
     def run_object_detection(self):
-        messagebox.showinfo("Detección de Objetos", "Aquí irá YOLO, SSD, o tu modelo personalizado.")
+        if not self.running:
+            messagebox.showwarning("Advertencia", "Primero inicia la cámara.")
+            return
+        self.detect_objects = True
+        self.detect_faces = False
+        messagebox.showinfo("Detección de Objetos", "Detectando personas en tiempo real.")
 
     def save_frame(self):
         messagebox.showinfo("Guardar", "Función de guardar imagen aún no implementada.")
@@ -124,6 +178,15 @@ class VisionApp:
     def change_camera(self):
         self.camera_index = (self.camera_index + 1) % 3
         messagebox.showinfo("Cámara", f"Cambiado a cámara {self.camera_index}")
+
+    def train_model(self):
+        try:
+            from reconocimiento.pipeline_entrenamiento import entrenar_modelo
+            entrenar_modelo()
+            self.face_recognizer.load_model()  # Recargar el modelo
+            messagebox.showinfo("Entrenamiento", "Modelo entrenado exitosamente.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al entrenar: {str(e)}")
 
 # ============================
 #  MAIN

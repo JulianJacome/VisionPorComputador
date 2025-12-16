@@ -25,3 +25,7 @@ python-dotenv
 
 # --- Utilidades ---
 tqdm
+
+# --- Visión por Computador ---
+opencv-contrib-python
+Pillow
