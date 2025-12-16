@@ -16,6 +16,10 @@ class VisionApp:
         self.running = False
 
         self.build_interface()
+
+    def on_closing(self):
+        self.stop_camera()
+        self.root.destroy()
     
     # ============================
     #  UI COMPLETA
@@ -44,6 +48,10 @@ class VisionApp:
         btn1 = ttk.Button(side_panel, text="Iniciar Cámara",
                           command=self.start_camera)
         btn1.pack(fill="x", padx=20, pady=10)
+
+        btn_stop = ttk.Button(side_panel, text="Detener Cámara",
+                              command=self.stop_camera)
+        btn_stop.pack(fill="x", padx=20, pady=10)
 
         btn2 = ttk.Button(side_panel, text="Reconocimiento Facial",
                           command=self.run_face_recognition)
@@ -78,20 +86,28 @@ class VisionApp:
         
         self.running = True
         self.cap = cv2.VideoCapture(self.camera_index)
-        threading.Thread(target=self.update_frame, daemon=True).start()
+        self.update_frame()
 
     def update_frame(self):
-        while self.running:
-            ret, frame = self.cap.read()
-            if not ret:
-                continue
-
+        if not self.running:
+            return
+        
+        ret, frame = self.cap.read()
+        if ret:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = cv2.resize(frame, (780, 560))
 
             img = ImageTk.PhotoImage(Image.fromarray(frame))
             self.video_frame.imgtk = img
             self.video_frame.config(image=img)
+        
+        self.root.after(10, self.update_frame)
+
+    def stop_camera(self):
+        self.running = False
+        if self.cap:
+            self.cap.release()
+        self.video_frame.config(image='')
 
     # ============================
     #  PLACEHOLDERS PARA MÓDULOS
@@ -115,4 +131,5 @@ class VisionApp:
 if __name__ == "__main__":
     root = tk.Tk()
     app = VisionApp(root)
+    root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
