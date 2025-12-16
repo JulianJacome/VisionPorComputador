@@ -1,8 +1,9 @@
 import cv2
-import os
+import numpy as np
+from pathlib import Path
 
 # Ruta base del dataset
-BASE = "dataset"
+BASE = Path(__file__).parent.parent.parent / "dataset"
 
 # Detector frontal de OpenCV
 face_detector = cv2.CascadeClassifier(cv2.data.haarcascades + 
@@ -12,17 +13,20 @@ face_detector = cv2.CascadeClassifier(cv2.data.haarcascades +
 # Procesar y segmentar imágenes
 # ---------------------------
 def procesar_persona(nombre):
-    folder_raw = os.path.join(BASE, nombre, "sin_procesar")
-    folder_proc = os.path.join(BASE, nombre, "procesadas")
-    folder_seg = os.path.join(BASE, nombre, "segmentadas")
+    folder_raw = BASE / nombre / "sin_procesar"
+    folder_proc = BASE / nombre / "procesadas"
+    folder_seg = BASE / nombre / "segmentadas"
 
-    os.makedirs(folder_proc, exist_ok=True)
-    os.makedirs(folder_seg, exist_ok=True)
+    folder_proc.mkdir(parents=True, exist_ok=True)
+    folder_seg.mkdir(parents=True, exist_ok=True)
 
-    for file in os.listdir(folder_raw):
-        path = os.path.join(folder_raw, file)
+    for file in folder_raw.iterdir():
+        if not file.is_file() or file.suffix.lower() not in ['.jpg', '.jpeg', '.png']:
+            continue
+        path = str(file.resolve())
 
-        img = cv2.imread(path)
+        img_data = np.fromfile(path, dtype=np.uint8)
+        img = cv2.imdecode(img_data, cv2.IMREAD_COLOR)
         if img is None:
             continue
 
@@ -33,8 +37,11 @@ def procesar_persona(nombre):
         # PROCESADAS (recorte + resize)
         # ---------------------------
         img_resized = cv2.resize(img, (300, 300))
-        proc_path = os.path.join(folder_proc, file)
-        cv2.imwrite(proc_path, img_resized)
+        proc_path = str(folder_proc / file.name)
+        success, encoded = cv2.imencode('.jpg', img_resized)
+        if success:
+            with open(proc_path, 'wb') as f:
+                f.write(encoded.tobytes())
 
         # ---------------------------
         # SEGMENTADAS (solo el rostro)
@@ -43,12 +50,18 @@ def procesar_persona(nombre):
             (x, y, w, h) = faces[0]
             rostro = img[y:y+h, x:x+w]
             rostro = cv2.resize(rostro, (200, 200))
-            seg_path = os.path.join(folder_seg, file)
-            cv2.imwrite(seg_path, rostro)
+            seg_path = str(folder_seg / file.name)
+            success, encoded = cv2.imencode('.jpg', rostro)
+            if success:
+                with open(seg_path, 'wb') as f:
+                    f.write(encoded.tobytes())
         else:
             # Si no detecta rostro, igual guarda algo para no perder imagen
-            seg_path = os.path.join(folder_seg, "no_rostro_" + file)
-            cv2.imwrite(seg_path, img)
+            seg_path = str(folder_seg / ("no_rostro_" + file.name))
+            success, encoded = cv2.imencode('.jpg', img)
+            if success:
+                with open(seg_path, 'wb') as f:
+                    f.write(encoded.tobytes())
 
     print(f"[OK] Procesado completo para: {nombre}")
 
