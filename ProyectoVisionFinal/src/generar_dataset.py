@@ -17,7 +17,7 @@ for persona in os.listdir(RUTA_DATASET):
         continue
 
     ruta_entrada = os.path.join(ruta_persona, "sin_procesar")
-    ruta_salida = os.path.join(ruta_persona, "sin_procesar")
+    ruta_salida = os.path.join(ruta_persona, "procesadas")
 
     if not os.path.exists(ruta_entrada):
         continue
